@@ -1,0 +1,30 @@
+FROM python:3.10 as builder
+WORKDIR /app
+
+RUN pip install poetry poetry-plugin-export
+
+COPY pyproject.toml poetry.lock ./
+
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+
+RUN python -m venv /opt/venv
+
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir -r requirements.txt
+
+
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+
+COPY ./src ./src
+
+ENV PATH ="/opt/venv/bin:$PATH"
+
+RUN useradd -m metropolis_user && chown -R metropolis_user:metropolis_user /app
+USER metropolis_user
+
+CMD ["uvicorn", "src.metropolis.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

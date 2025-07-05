@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: metropolis-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=metropolis
+      - POSTGRES_PASSWORD=metropolis
+      - POSTGRES_DB=metropolis_db
+    volumes:
+      - postgres_data:/var/lib/postgressql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metropolis -d metropolis_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+  redis:
+    image: redis:7-alpine
+    container_name: metropolis_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli","ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  
+
+  api:
+    container_name: metropolis-api
+    build: 
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+volumes:
+  postgres_data:
+      driver: local
+           
+
