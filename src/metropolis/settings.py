@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings,SettingsConfigDict
 class Settings(BaseSettings):
-    # This tells Pydantic to load variables from a .env file
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
     # --- Application Settings ---
@@ -20,8 +19,6 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         """Asynchronously compatible database URL."""
-        # Note: We will likely switch to an async driver later, but for now, this is fine.
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
-# Create a single, reusable instance of the settings
 settings = Settings()
