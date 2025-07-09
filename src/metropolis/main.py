@@ -1,12 +1,12 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import time
 from . import models
 from .database import engine, get_db
 from .settings import settings
-from schemas import PipelineCreate
-from crud import get_pipeline_by_name,create_pipeline
+from .schemas import PipelineCreate,Pipeline
+from .crud import get_pipeline_by_name,create_pipeline
 
 max_retries = 5
 retry_delay = 5  # in seconds
@@ -47,7 +47,16 @@ def health_check(db: Session = Depends(get_db)):
         "environment": settings.ENVIRONMENT
     }
 
-@app.post("/pipelines",response_class=models.Pipeline)
-def pipeline_create(pipeline:PipelineCreate,db:Session = Depends(get_db)):
-    db_pipeline = create_pipeline(pipeline=pipeline,db=db)
-    return db_pipeline
+@app.post("/pipelines",response_model=Pipeline,status_code=201)
+def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_db)):
+    db_pipeline = get_pipeline_by_name(name=pipeline_in.name)
+    if db_pipeline:
+        raise HTTPException(
+            status_code=400, # Bad Request
+            detail=f"Pipeline with name '{pipeline_in.name}' already exists"
+        )
+    try:
+        return create_pipeline(pipeline=pipeline_in,db=db)
+    except Exception as e:
+        raise HTTPException(status_code=500,detail=str(e))
+    
