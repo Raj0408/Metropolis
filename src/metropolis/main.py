@@ -49,7 +49,7 @@ def health_check(db: Session = Depends(get_db)):
 
 @app.post("/pipelines",response_model=Pipeline,status_code=201)
 def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_db)):
-    db_pipeline = get_pipeline_by_name(name=pipeline_in.name)
+    db_pipeline = get_pipeline_by_name(db=db,name=pipeline_in.name)
     if db_pipeline:
         raise HTTPException(
             status_code=400, # Bad Request
