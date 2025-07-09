@@ -5,6 +5,8 @@ import time
 from . import models
 from .database import engine, get_db
 from .settings import settings
+from schemas import PipelineCreate
+from crud import get_pipeline_by_name,create_pipeline
 
 max_retries = 5
 retry_delay = 5  # in seconds
@@ -44,3 +46,8 @@ def health_check(db: Session = Depends(get_db)):
         "database_status": db_status,
         "environment": settings.ENVIRONMENT
     }
+
+@app.post("/pipelines",response_class=models.Pipeline)
+def pipeline_create(pipeline:PipelineCreate,db:Session = Depends(get_db)):
+    db_pipeline = create_pipeline(pipeline=pipeline,db=db)
+    return db_pipeline
