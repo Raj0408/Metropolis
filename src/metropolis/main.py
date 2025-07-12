@@ -57,12 +57,11 @@ def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_d
             detail=f"Pipeline with name '{pipeline_in.name}' already exists"
         )
     try:
-        if validate_pipeline_dag(pipeline_in):
-            return create_pipeline(pipeline=pipeline_in,db=db)
-        else:
-            raise Exception("Invalid Pipeline")
-    except Exception as e:
-        raise HTTPException(status_code=500,detail=str(e))
+        validate_pipeline_dag(pipeline_in.definition)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return create_pipeline(db=db, pipeline=pipeline_in)
     
 @app.get("/pipeline",response_model=Pipeline,status_code=201)
 def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):

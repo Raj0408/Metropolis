@@ -1,7 +1,8 @@
-from .schemas import PipelineCreate
-import queue
+from collections import deque
+from typing import Dict
+from .schemas import TaskDefinition 
 
-def validate_pipeline_dag(db_pipeline:PipelineCreate) -> bool:
+def validate_pipeline_dag(definition: Dict[str, TaskDefinition]) -> bool:
 
     """
     Validates that the pipeline definition is a valid Directed Acyclic Graph (DAG).
@@ -15,41 +16,31 @@ def validate_pipeline_dag(db_pipeline:PipelineCreate) -> bool:
                     points to a non-existent task.
     """
 
+    graph = {task_id: [] for task_id in definition}
+    in_degree = {task_id: 0 for task_id in definition}
 
-    definition = db_pipeline.definition
-    nodes = {}
-    in_degree = {}
-    edges = {}
-    queue_for = queue.Queue(maxsize=len(definition))
-    for key,value in definition.items():
-        nodes[key] = []
-        in_degree[key] = len(value.dependencies)
-        if in_degree[key]:
-            for values in value.dependencies:
-                nodes[key].append(values)
-        else:
-            queue_for.put(key)
-    for key in definition:
-        edges[key] = []
-        for keys, values in nodes.items():
-            if key in values:
-                edges[key].append(keys)
+    for task_id, task_def in definition.items():
+        for dependency in task_def.dependencies:
+            if dependency not in graph:
+                raise ValueError(f"Task '{task_id}' has an invalid dependency: '{dependency}' does not exist.")
+        
+            graph[dependency].append(task_id)
+            in_degree[task_id] += 1
+
+    queue = deque([task_id for task_id, degree in in_degree.items() if degree == 0])
     
-    if(queue_for.qsize() == 0):
-        return False
-    travs = 0
-    while(queue_for.qsize()):
-        key = queue_for.get()
-        print(key)
-        travs = travs + 1
-        for edg in edges[key]:
-            print(edg)
-            in_degree[edg] = in_degree[edg] - 1
-            print(in_degree[edg])
-            if in_degree[edg] == 0:
-                queue_for.put(edg)
-    
-    if travs != len(definition):
-        return False
-    
-    return True
+    if not queue and definition:
+        raise ValueError("Invalid pipeline: a cycle was detected (no root nodes found).")
+
+    sorted_nodes_count = 0
+    while queue:
+        current_task_id = queue.popleft()
+        sorted_nodes_count += 1
+
+        for dependent_task_id in graph[current_task_id]:
+            in_degree[dependent_task_id] -= 1
+            if in_degree[dependent_task_id] == 0:
+                queue.append(dependent_task_id)
+
+    if sorted_nodes_count != len(definition):
+        raise ValueError("Invalid pipeline: a cycle was detected.")
