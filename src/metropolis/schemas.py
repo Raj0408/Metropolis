@@ -13,6 +13,9 @@ class PipelineBase(BaseModel):
 class PipelineCreate(PipelineBase):
     pass
 
+class PipelineGet(BaseModel):
+    name:str
+
 class Pipeline(PipelineBase):
     id:int
     created_at: datetime

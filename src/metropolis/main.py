@@ -5,8 +5,9 @@ import time
 from . import models
 from .database import engine, get_db
 from .settings import settings
-from .schemas import PipelineCreate,Pipeline
+from .schemas import PipelineCreate,Pipeline,PipelineGet
 from .crud import get_pipeline_by_name,create_pipeline
+from .validation import validate_pipeline_dag
 
 max_retries = 5
 retry_delay = 5  # in seconds
@@ -56,7 +57,21 @@ def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_d
             detail=f"Pipeline with name '{pipeline_in.name}' already exists"
         )
     try:
-        return create_pipeline(pipeline=pipeline_in,db=db)
+        if validate_pipeline_dag(pipeline_in):
+            return create_pipeline(pipeline=pipeline_in,db=db)
+        else:
+            raise Exception("Invalid Pipeline")
     except Exception as e:
         raise HTTPException(status_code=500,detail=str(e))
     
+@app.get("/pipeline",response_model=Pipeline,status_code=201)
+def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):
+    db_pipeline = get_pipeline_by_name(db=db,name=pipeline_name.name)
+    
+    if db_pipeline:
+        return db_pipeline
+    else:
+        raise HTTPException(
+            status_code=400, # Bad Request
+            detail=f"Pipeline not Exists"
+        )
