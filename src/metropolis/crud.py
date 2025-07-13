@@ -19,3 +19,39 @@ def create_pipeline(db:Session,pipeline:schemas.PipelineCreate) -> models.Pipeli
     db.commit()
     db.refresh(db_pipeline)
     return db_pipeline
+
+
+def get_pipeline_by_id(db:Session,id:str):
+    return db.query(models.Pipeline).filter(models.Pipeline.id == id).first()
+
+    
+
+def create_pipeline_run(db:Session,pipeline:models.Pipeline,run_in:schemas.PipelineRunCreate) -> models.PipelineRun:
+    
+    db_pipeline_run = models.PipelineRun(
+        pipeline_id = pipeline.id,
+        parameters =run_in.run_parameters,
+        status = models.PipelineRunStatus.PENDING
+    )
+    db.add(db_pipeline_run)
+    db.commit()
+    db.refresh(db_pipeline_run)
+
+
+    jobs = []
+
+    for task_name in pipeline.definition:
+        job = models.Job(
+            task_id=task_name,
+            pipeline_run_id = db_pipeline_run.id,
+            status = models.JobStatus.PENDING
+        )
+        jobs.append(job)
+    
+    db.add_all(jobs)
+    db.commit()
+    db.refresh(db_pipeline_run)
+
+    return db_pipeline_run
+
+   

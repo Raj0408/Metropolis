@@ -22,6 +22,12 @@ class JobStatus(str, enum.Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
 
+class PipelineRunStatus(str,enum.Enum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
 
 class Pipeline(Base):
     __tablename__ = "pipelines"
@@ -38,6 +44,7 @@ class PipelineRun(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     pipeline_id = Column(Integer, ForeignKey("pipelines.id"), nullable=False)
+    status = Column(String,nullable=True)
     parameters = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     pipeline = relationship("Pipeline", back_populates="runs")

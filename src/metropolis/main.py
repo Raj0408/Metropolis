@@ -1,14 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import time
 from . import models
 from .database import engine, get_db
 from .settings import settings
-from .schemas import PipelineCreate,Pipeline,PipelineGet
-from .crud import get_pipeline_by_name,create_pipeline
+from .schemas import PipelineCreate,Pipeline,PipelineGet,PipelineRunCreate
+from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run
 from .validation import validate_pipeline_dag
-
+from .broker import redis_client,READY_QUEUE_NAME
 max_retries = 5
 retry_delay = 5  # in seconds
 
@@ -66,7 +66,7 @@ def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_d
 @app.get("/pipeline",response_model=Pipeline,status_code=201)
 def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):
     db_pipeline = get_pipeline_by_name(db=db,name=pipeline_name.name)
-    
+    print(db_pipeline.definition)
     if db_pipeline:
         return db_pipeline
     else:
@@ -74,3 +74,34 @@ def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):
             status_code=400, # Bad Request
             detail=f"Pipeline not Exists"
         )
+
+@app.post("/pipelines/{pipeline_id}/run")
+def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = Depends(get_db)):
+
+    pipeline = get_pipeline_by_id(db,pipeline_id)
+    if not pipeline:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pipeline with id {pipeline_id} not found."
+        )
+    pipeline_run = create_pipeline_run(db=db,pipeline=pipeline,run_in=run_in)
+
+
+    root_jobs = []
+    pipeline_def = pipeline.definition
+    for job in  pipeline_run.jobs:
+        if not pipeline_def[job.task_id]['dependencies']:
+            root_jobs.append(job)
+
+    
+    for job in root_jobs:
+        redis_client.rpush(READY_QUEUE_NAME,job.id)
+        job.status = models.JobStatus.QUEUED
+    
+
+    pipeline_run.status = models.PipelineRunStatus.RUNNING
+
+    db.commit()
+    db.refresh(pipeline_run)
+
+    return pipeline_run
