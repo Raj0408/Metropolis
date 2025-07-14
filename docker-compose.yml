@@ -44,6 +44,19 @@ services:
     depends_on:
       - postgres
       - redis
+  worker:
+    container_name: metropolis-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+
 volumes:
   postgres_data:
       driver: local
