@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-import time
+import time,json
 from . import models
 from .database import engine, get_db
 from .settings import settings
@@ -85,10 +85,33 @@ def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = D
             detail=f"Pipeline with id {pipeline_id} not found."
         )
     pipeline_run = create_pipeline_run(db=db,pipeline=pipeline,run_in=run_in)
-
-
-    root_jobs = []
     pipeline_def = pipeline.definition
+
+    job_map = {job.task_id:job for job in pipeline_run.jobs}
+
+    with redis_client.pipeline() as pipe:
+        dep_count_key = f"metropolis:run:{pipeline_run.id}:deps_count"
+
+        reverse_graph = {task_id:[] for task_id in pipeline_def}
+
+        for task_id, task_def in pipeline_def.items():
+            job_id = job_map[task_id].id
+            num_deps = len(task_def.dependencies)
+            pipe.hset(dep_count_key,job_id,num_deps)
+            
+            # Reverse graph populate
+            for parent_task_id in  task_def.dependencies:
+                reverse_graph[parent_task_id].append(job_id)
+        
+        reverse_graph_key = f"metropolis:run:{pipeline_run.id}:reverse_graph"
+
+        for task_id , jobs in reverse_graph.items():
+            parent_job_id = job_map[task_id].id
+            pipe.hset(reverse_graph_key,parent_job_id,json.dumps(jobs))
+        
+        pipe.execute()
+
+    root_jobs = []   
     for job in  pipeline_run.jobs:
         if not pipeline_def[job.task_id]['dependencies']:
             root_jobs.append(job)
@@ -103,5 +126,6 @@ def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = D
 
     db.commit()
     db.refresh(pipeline_run)
+
 
     return pipeline_run
