@@ -96,11 +96,11 @@ def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = D
 
         for task_id, task_def in pipeline_def.items():
             job_id = job_map[task_id].id
-            num_deps = len(task_def.dependencies)
+            num_deps = len(task_def['dependencies'])
             pipe.hset(dep_count_key,job_id,num_deps)
             
             # Reverse graph populate
-            for parent_task_id in  task_def.dependencies:
+            for parent_task_id in  task_def['dependencies']:
                 reverse_graph[parent_task_id].append(job_id)
         
         reverse_graph_key = f"metropolis:run:{pipeline_run.id}:reverse_graph"

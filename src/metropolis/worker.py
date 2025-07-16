@@ -1,3 +1,4 @@
+import json
 import time
 import sqlalchemy.orm
 
@@ -8,11 +9,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from metropolis import models, crud
 from metropolis.database import SessionLocal
 from metropolis.broker import redis_client, READY_QUEUE_NAME
+from metropolis.lua_scripts import COMPLETE_JOB_SCRIPT
 
 def get_db() -> sqlalchemy.orm.Session:
     return SessionLocal()
 
 
+complete_job_lua = redis_client.register_script(COMPLETE_JOB_SCRIPT)
 
 def run_worker():
     print("--- Metropolis Worker is running ---")
@@ -41,7 +44,22 @@ def run_worker():
 
             time.sleep(5)
 
-            print(f"    -> Task '{job.task_id}' completed successfully.")
+
+            reverse_graph_key = f"metropolis:run:{job.pipeline_run_id}:reverse_graph"
+            
+            depends_jobs_json = redis_client.hget(reverse_graph_key,str(job.id))
+            
+            depends_job_ids = json.loads(depends_jobs_json) if depends_jobs_json else []
+
+            deps_count_key = f"metropolis:run:{job.pipeline_run_id}:deps_count"
+            keys = [deps_count_key,READY_QUEUE_NAME]
+
+            ready_jobs = complete_job_lua(keys=keys,args=depends_job_ids)
+
+            print(f"    -> Atomically enqueued {len(ready_jobs)} downstream jobs: {ready_jobs}")
+
+
+            
             job.status = models.JobStatus.SUCCESS
             db.commit()
         except Exception as e:
@@ -51,7 +69,9 @@ def run_worker():
                 job.logs = str(e)
                 db.commit()
 
-            time.sleep(10)
+            time.sleep(5)
+
+
         finally:
             if db:
                 db.close()
