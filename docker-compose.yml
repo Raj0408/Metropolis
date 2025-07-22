@@ -56,6 +56,18 @@ services:
     depends_on:
       - postgres
       - redis
+  janitor:
+    container_name: metropolis-janitor
+    build:
+      context: .
+      dockerfile: Dockerfile.janitor
+    volumes:
+      - ./src:/app/src
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
 
 volumes:
   postgres_data:
