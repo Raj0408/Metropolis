@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from metropolis import models, crud
 from metropolis.database import SessionLocal
-from metropolis.broker import redis_client, READY_QUEUE_NAME
+from metropolis.broker import redis_client, READY_QUEUE_NAME, DELAYED_QUEUE_NAME
 
 def get_db() -> sqlalchemy.orm.Session:
     return SessionLocal()

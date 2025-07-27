@@ -10,3 +10,5 @@ redis_client = redis.Redis(
 )
 
 READY_QUEUE_NAME = "metropolis:ready_queue"
+DELAYED_QUEUE_NAME = "metropolis:delayed_queue" # A Redis Sorted Set
+DEAD_LETTER_QUEUE_NAME = "metropolis:dead_letter_queue" # A Redis List

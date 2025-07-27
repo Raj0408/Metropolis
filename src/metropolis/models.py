@@ -59,6 +59,8 @@ class Job(Base):
     pipeline_run_id = Column(Integer, ForeignKey("pipeline_runs.id"), nullable=False)
     status = Column(SAEnum(JobStatus), nullable=False, default=JobStatus.PENDING)
     result = Column(JSON, nullable=True)
+    retry_count = Column(Integer, nullable=False,default=0)
+    logs = Column(String, nullable=True)
     run_history = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

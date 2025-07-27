@@ -12,12 +12,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from metropolis import models
 from metropolis.database import SessionLocal
-from metropolis.broker import redis_client, READY_QUEUE_NAME
+from metropolis.broker import redis_client, READY_QUEUE_NAME, DEAD_LETTER_QUEUE_NAME,DELAYED_QUEUE_NAME
 from metropolis.lua_scripts import COMPLETE_JOB_SCRIPT
 
-# --- Configuration Constants ---
-LOCK_TTL_SECONDS = 300  # 5 minutes: The lease time for a job lock.
-HEARTBEAT_INTERVAL_SECONDS = 60 # 1 minute: How often the worker renews the lease.
+LOCK_TTL_SECONDS = 300  # 5 minutes
+HEARTBEAT_INTERVAL_SECONDS = 60 # 1 minute:
+MAX_RETRY = 3
+RETRY_DELAY_BASE_SECONDS = 10
 
 def get_db() -> sqlalchemy.orm.Session:
     return SessionLocal()
@@ -25,15 +26,10 @@ def get_db() -> sqlalchemy.orm.Session:
 complete_job_lua = redis_client.register_script(COMPLETE_JOB_SCRIPT)
 
 def heartbeat(job_id: int, stop_event: threading.Event):
-    """
-    A function to be run in a separate thread.
-    It periodically updates the TTL of the job's lock in Redis.
-    """
     lock_key = f"metropolis:job:{job_id}:lock"
     while not stop_event.wait(HEARTBEAT_INTERVAL_SECONDS):
         try:
             print(f"    ~ Heartbeat: Renewing lock for job {job_id}")
-            # PEXPIRE sets the timeout in milliseconds.
             redis_client.pexpire(lock_key, LOCK_TTL_SECONDS * 1000)
         except Exception as e:
             print(f"    ~ Heartbeat Error: Could not renew lock for job {job_id}: {e}")
@@ -56,20 +52,17 @@ def run_worker():
             lock_key = f"metropolis:job:{job_id}:lock"
             worker_id = f"worker-{os.getpid()}"
 
-            # --- 1. Try to acquire the lock ---
-            # SET with NX (Not Exists) and EX (Expire) is an atomic "acquire lock" operation.
-            # It will only succeed if the key does not already exist.
             if not redis_client.set(lock_key, worker_id, ex=LOCK_TTL_SECONDS, nx=True):
                 print(f"[-] Could not acquire lock for job {job_id}. Another worker took it. Skipping.")
                 continue # Go back to the start of the loop to get another job
 
             print(f"\n[+] Acquired lock for job {job_id}")
 
-            # --- 2. Start the heartbeat thread ---
+         
             heartbeat_thread = threading.Thread(target=heartbeat, args=(job_id, stop_heartbeat))
             heartbeat_thread.start()
 
-            # --- 3. Update DB and start processing ---
+            
             db = get_db()
             job = db.query(models.Job).filter(models.Job.id == job_id).first()
 
@@ -81,10 +74,10 @@ def run_worker():
             db.commit()
             print(f"    -> Starting task: '{job.task_id}' for run_id: {job.pipeline_run_id}")
 
-            # Simulate work
-            time.sleep(70) # A short sleep for testing
+            
+            time.sleep(5) 
 
-            # --- 4. Finish Processing (The New Atomic Way) ---
+
             print(f"    -> Task '{job.task_id}' finished. Triggering completion script.")
             run_id = job.pipeline_run_id
             reverse_graph_key = f"metropolis:run:{run_id}:reverse_graph"
@@ -102,18 +95,28 @@ def run_worker():
         except Exception as e:
             print(f"[X] An unexpected error occurred: {e}")
             if db and job:
-                job.status = models.JobStatus.FAILED
-                job.logs = str(e)
+                job.retry_count += 1
+                if job.retry_count > MAX_RETRY:
+                    job.status = models.JobStatus.FAILED
+                    job.logs = str(e)
+                    redis_client.lpush(DEAD_LETTER_QUEUE_NAME,job.id)
+                else:
+                    delay = RETRY_DELAY_BASE_SECONDS * (2 ** (job.retry_count - 1))
+                    retry_time_stamp = int(time.time()+delay)
+                    print(f"    -> Scheduling job {job.id} for retry in {delay} seconds.")
+                    redis_client.zadd(DELAYED_QUEUE_NAME,{job.id:retry_time_stamp})
                 db.commit()
+            else:
+                print(f"    -> Could not process failure for job ID {job_id_str}, Janitor will recover.")
+
+            time.sleep(1)
+                
         finally:
-            # --- 5. Cleanup: Stop the heartbeat and release the lock ---
-            # This 'finally' block ensures cleanup happens even if an error occurs.
             stop_heartbeat.set()
             if heartbeat_thread and heartbeat_thread.is_alive():
                 heartbeat_thread.join()
             
             if lock_key:
-                # We must delete the lock when we're done.
                 print(f"    -> Releasing lock for job {job_id}")
                 redis_client.delete(lock_key)
 
