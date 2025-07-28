@@ -41,6 +41,8 @@ services:
       - ./src:/app/src
     env_file:
       - .env
+    environment:
+      - METROPOLIS_SERVICE_NAME=api
     depends_on:
       - postgres
       - redis

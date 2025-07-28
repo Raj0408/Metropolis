@@ -9,13 +9,20 @@ from .schemas import PipelineCreate,Pipeline,PipelineGet,PipelineRunCreate
 from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run,get_pipeline_run
 from .validation import validate_pipeline_dag
 from .broker import redis_client,READY_QUEUE_NAME
+import logging
+from .log_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
+
+
 max_retries = 5
 retry_delay = 5  # in seconds
 
 for attempt in range(max_retries):
     try:
         models.Base.metadata.create_all(bind=engine)
-        print("Database tables created successfully.")
+        logger.info("Database tables verified/created successfully.")
         break  
     except Exception as e:
         print(f"Database connection failed (Attempt {attempt + 1}/{max_retries}): {e}")
@@ -40,6 +47,7 @@ def health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         db_status = "ok"
     except Exception as e:
+        logger.error("Database health check failed", extra={"error": str(e)})
         db_status = f"error: {e}"
 
     return {
@@ -78,6 +86,11 @@ def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):
     
 @app.post("/pipelines/{pipeline_id}/run")
 def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = Depends(get_db)):
+    
+    logger.info(
+        "Triggering new pipeline run",
+        extra={"pipeline_id": pipeline_id, "run_parameters": run_in.run_parameters}
+    )
 
     pipeline = get_pipeline_by_id(db,pipeline_id)
     if not pipeline:

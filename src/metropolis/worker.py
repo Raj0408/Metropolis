@@ -14,6 +14,11 @@ from metropolis import models
 from metropolis.database import SessionLocal
 from metropolis.broker import redis_client, READY_QUEUE_NAME, DEAD_LETTER_QUEUE_NAME,DELAYED_QUEUE_NAME
 from metropolis.lua_scripts import COMPLETE_JOB_SCRIPT
+import logging
+from .log_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 LOCK_TTL_SECONDS = 300  # 5 minutes
 HEARTBEAT_INTERVAL_SECONDS = 60 # 1 minute:
@@ -35,8 +40,8 @@ def heartbeat(job_id: int, stop_event: threading.Event):
             print(f"    ~ Heartbeat Error: Could not renew lock for job {job_id}: {e}")
 
 def run_worker():
-    print("--- Metropolis Worker is running (Locking & Heartbeat Mode) ---")
-    print(f"Listening for jobs on queue: '{READY_QUEUE_NAME}'")
+    logger.info(f"Metropolis Worker is running (High-Performance Mode)")
+    logger.info(f"Listening for jobs on queue: '{READY_QUEUE_NAME}'")
     
     while True:
         job_id_str = None
@@ -51,12 +56,26 @@ def run_worker():
             job_id = int(job_id_str)
             lock_key = f"metropolis:job:{job_id}:lock"
             worker_id = f"worker-{os.getpid()}"
+            logger.info(f"Received job", extra={"job_id": job_id})
+            if not job:
+                logger.warning("Job not found in database", extra={"job_id": job_id})
+                continue
+
+            logger.info(
+                "Starting task",
+                extra={
+                    "job_id": job.id,
+                    "run_id": job.pipeline_run_id,
+                    "task_id": job.task_id,
+                    "attempt": job.retry_count + 1
+                }
+            )
 
             if not redis_client.set(lock_key, worker_id, ex=LOCK_TTL_SECONDS, nx=True):
                 print(f"[-] Could not acquire lock for job {job_id}. Another worker took it. Skipping.")
                 continue # Go back to the start of the loop to get another job
 
-            print(f"\n[+] Acquired lock for job {job_id}")
+           
 
          
             heartbeat_thread = threading.Thread(target=heartbeat, args=(job_id, stop_heartbeat))
@@ -74,8 +93,10 @@ def run_worker():
             db.commit()
             print(f"    -> Starting task: '{job.task_id}' for run_id: {job.pipeline_run_id}")
 
+            if str(job.task_id) == 'step4':
+                raise Exception("Unable to process")
             
-            time.sleep(3) 
+            time.sleep(5) 
 
 
             print(f"    -> Task '{job.task_id}' finished. Triggering completion script.")
@@ -98,17 +119,25 @@ def run_worker():
             print(f"    -> {jobs_left} jobs remaining for run {run_id}.")
 
             if jobs_left == 0:
-                print(f"[CC] Run {run_id} has no jobs left. Marking as SUCCESS.")
+                logger.info(
+                    "Task finished successfully",
+                    extra={"job_id": job.id, "task_id": job.task_id}
+                )
                 job.pipeline_run.status = models.PipelineRunStatus.SUCCESS
                 db.commit()
 
         except Exception as e:
-            print(f"[X] An unexpected error occurred: {e}")
+            logger.error(
+                "Task failed",
+                extra={"job_id": job.id if job else job_id_str, "error": str(e)},
+                exc_info=True 
+            )
             if db and job:
                 job.retry_count += 1
                 if job.retry_count > MAX_RETRY:
                     job.status = models.JobStatus.FAILED
                     job.logs = str(e)
+                    job.pipeline_run.status = models.PipelineRunStatus.FAILED
                     redis_client.lpush(DEAD_LETTER_QUEUE_NAME,job.id)
                 else:
                     delay = RETRY_DELAY_BASE_SECONDS * (2 ** (job.retry_count - 1))

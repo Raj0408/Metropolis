@@ -9,6 +9,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from metropolis import models, crud
 from metropolis.database import SessionLocal
 from metropolis.broker import redis_client, READY_QUEUE_NAME, DELAYED_QUEUE_NAME
+import logging
+from .log_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger(__name__)
 
 def get_db() -> sqlalchemy.orm.Session:
     return SessionLocal()
@@ -17,6 +22,7 @@ def get_db() -> sqlalchemy.orm.Session:
 janitor_time = 30 #30 Sec for now
 
 def zombie_job_checker():
+    logger.info("Checking for zombie jobs...")
     db = get_db()
     try:
         print("\n[J] Janitor waking up. Searching for stuck jobs...")
@@ -49,7 +55,7 @@ def requeue_delayed_jobs():
     """
     Checks the delayed queue (a sorted set) for jobs that are due to be retried.
     """
-    print("[J] Checking for delayed jobs to requeue...")
+    logger.info("Checking for delayed jobs to requeue...")
     
     current_time = int(time.time())
     jobs_to_requeue = redis_client.zrangebyscore(DELAYED_QUEUE_NAME, 0, current_time)
@@ -69,11 +75,12 @@ def requeue_delayed_jobs():
 def run_janitor():
 
     db = None
-    print("--- Metropolis Janitor is running ---")
+    logger.info("Metropolis Janitor/Re-scheduler is running")
     print(f"Scanning for zombie jobs every {janitor_time} seconds.")
     while True:
             zombie_job_checker()
             requeue_delayed_jobs()
+            logger.info("Janitor cycle complete. Sleeping for 60 seconds.")
             time.sleep(janitor_time)
 
 if __name__ == "__main__":
