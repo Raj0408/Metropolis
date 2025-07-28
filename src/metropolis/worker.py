@@ -75,7 +75,7 @@ def run_worker():
             print(f"    -> Starting task: '{job.task_id}' for run_id: {job.pipeline_run_id}")
 
             
-            time.sleep(5) 
+            time.sleep(3) 
 
 
             print(f"    -> Task '{job.task_id}' finished. Triggering completion script.")
@@ -91,6 +91,16 @@ def run_worker():
 
             job.status = models.JobStatus.SUCCESS
             db.commit()
+
+            jobs_remaining_key = f"metropolis:run:{run_id}:jobs_count"
+            jobs_left = redis_client.decr(jobs_remaining_key)
+
+            print(f"    -> {jobs_left} jobs remaining for run {run_id}.")
+
+            if jobs_left == 0:
+                print(f"[CC] Run {run_id} has no jobs left. Marking as SUCCESS.")
+                job.pipeline_run.status = models.PipelineRunStatus.SUCCESS
+                db.commit()
 
         except Exception as e:
             print(f"[X] An unexpected error occurred: {e}")

@@ -6,7 +6,7 @@ from . import models
 from .database import engine, get_db
 from .settings import settings
 from .schemas import PipelineCreate,Pipeline,PipelineGet,PipelineRunCreate
-from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run
+from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run,get_pipeline_run
 from .validation import validate_pipeline_dag
 from .broker import redis_client,READY_QUEUE_NAME
 max_retries = 5
@@ -63,18 +63,19 @@ def handle_pipeline_create(pipeline_in:PipelineCreate,db:Session = Depends(get_d
 
     return create_pipeline(db=db, pipeline=pipeline_in)
     
-@app.get("/pipeline",response_model=Pipeline,status_code=201)
+@app.get("/pipeline",status_code=201)
 def get_pipeline(pipeline_name:PipelineGet,db:Session = Depends(get_db)):
     db_pipeline = get_pipeline_by_name(db=db,name=pipeline_name.name)
     print(db_pipeline.definition)
+    pipeline_run = get_pipeline_run(db=db,id=db_pipeline.id)
     if db_pipeline:
-        return db_pipeline
+        return pipeline_run
     else:
         raise HTTPException(
             status_code=400, # Bad Request
             detail=f"Pipeline not Exists"
         )
-
+    
 @app.post("/pipelines/{pipeline_id}/run")
 def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = Depends(get_db)):
 
@@ -91,6 +92,11 @@ def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = D
 
     with redis_client.pipeline() as pipe:
         dep_count_key = f"metropolis:run:{pipeline_run.id}:deps_count"
+        jobs_remaining_key = f"metropolis:run:{pipeline_run.id}:jobs_count"
+        print("Job_run id and count")
+        print(pipeline_run.id)
+        print(len(pipeline_run.jobs))
+        pipe.set(jobs_remaining_key, len(pipeline_run.jobs))
 
         reverse_graph = {task_id:[] for task_id in pipeline_def}
 

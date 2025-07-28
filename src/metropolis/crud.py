@@ -21,10 +21,13 @@ def create_pipeline(db:Session,pipeline:schemas.PipelineCreate) -> models.Pipeli
     return db_pipeline
 
 
-def get_pipeline_by_id(db:Session,id:str):
+def get_pipeline_by_id(db:Session,id:int):
     return db.query(models.Pipeline).filter(models.Pipeline.id == id).first()
 
-    
+def get_pipeline_run(db:Session,id:int):
+    pipeline_run = db.query(models.PipelineRun).filter(models.PipelineRun.pipeline_id == id).all()
+    return pipeline_run
+
 
 def create_pipeline_run(db:Session,pipeline:models.Pipeline,run_in:schemas.PipelineRunCreate) -> models.PipelineRun:
     
