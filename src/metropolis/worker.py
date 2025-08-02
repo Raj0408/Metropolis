@@ -34,10 +34,10 @@ def heartbeat(job_id: int, stop_event: threading.Event):
     lock_key = f"metropolis:job:{job_id}:lock"
     while not stop_event.wait(HEARTBEAT_INTERVAL_SECONDS):
         try:
-            print(f"    ~ Heartbeat: Renewing lock for job {job_id}")
+            logger.info(f"    ~ Heartbeat: Renewing lock for job {job_id}")
             redis_client.pexpire(lock_key, LOCK_TTL_SECONDS * 1000)
         except Exception as e:
-            print(f"    ~ Heartbeat Error: Could not renew lock for job {job_id}: {e}")
+            logger.error(f"    ~ Heartbeat Error: Could not renew lock for job {job_id}: {e}")
 
 def run_worker():
     logger.info(f"Metropolis Worker is running (High-Performance Mode)")
@@ -72,7 +72,7 @@ def run_worker():
             )
 
             if not redis_client.set(lock_key, worker_id, ex=LOCK_TTL_SECONDS, nx=True):
-                print(f"[-] Could not acquire lock for job {job_id}. Another worker took it. Skipping.")
+                logger.warning(f"[-] Could not acquire lock for job {job_id}. Another worker took it. Skipping.")
                 continue # Go back to the start of the loop to get another job
 
            
@@ -86,12 +86,12 @@ def run_worker():
             job = db.query(models.Job).filter(models.Job.id == job_id).first()
 
             if not job:
-                print(f"[!] Error: Job with ID {job_id} not found. Skipping.")
+                logger.info(f"[!] Error: Job with ID {job_id} not found. Skipping.")
                 continue
 
             job.status = models.JobStatus.RUNNING
             db.commit()
-            print(f"    -> Starting task: '{job.task_id}' for run_id: {job.pipeline_run_id}")
+            logger.info(f"    -> Starting task: '{job.task_id}' for run_id: {job.pipeline_run_id}")
 
             if str(job.task_id) == 'step4':
                 raise Exception("Unable to process")
@@ -99,7 +99,7 @@ def run_worker():
             time.sleep(5) 
 
 
-            print(f"    -> Task '{job.task_id}' finished. Triggering completion script.")
+            logger.info(f"    -> Task '{job.task_id}' finished. Triggering completion script.")
             run_id = job.pipeline_run_id
             reverse_graph_key = f"metropolis:run:{run_id}:reverse_graph"
             downstream_job_ids_json = redis_client.hget(reverse_graph_key, str(job.id))
@@ -108,7 +108,7 @@ def run_worker():
             keys = [deps_count_key, READY_QUEUE_NAME]
             
             newly_ready_jobs = complete_job_lua(keys=keys, args=downstream_job_ids)
-            print(f"    -> Atomically enqueued {len(newly_ready_jobs)} downstream jobs: {newly_ready_jobs}")
+            logger.info(f"    -> Atomically enqueued {len(newly_ready_jobs)} downstream jobs: {newly_ready_jobs}")
 
             job.status = models.JobStatus.SUCCESS
             db.commit()
@@ -156,7 +156,7 @@ def run_worker():
                 heartbeat_thread.join()
             
             if lock_key:
-                print(f"    -> Releasing lock for job {job_id}")
+                logger.info(f"    -> Releasing lock for job" ,extra={"job_id" : job.id})
                 redis_client.delete(lock_key)
 
             if db:

@@ -55,6 +55,8 @@ services:
       - ./src:/app/src
     env_file:
       - .env
+    environment:
+      - METROPOLIS_SERVICE_NAME=worker
     depends_on:
       - postgres
       - redis
@@ -67,6 +69,8 @@ services:
       - ./src:/app/src
     env_file:
       - .env
+    environment:
+      - METROPOLIS_SERVICE_NAME=janitor
     depends_on:
       - postgres
       - redis

@@ -45,7 +45,7 @@ def zombie_job_checker():
                     redis_client.rpush(READY_QUEUE_NAME,job.id)
             db.commit()
     except Exception as e:
-        print(f"[X] Janitor encountered an error: {str(e)}")
+        logger.exception(f"[X] Janitor encountered an error: {str(e)}")
     
     finally:
         if db:
