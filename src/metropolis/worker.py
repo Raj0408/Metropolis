@@ -16,9 +16,24 @@ from metropolis.broker import redis_client, READY_QUEUE_NAME, DEAD_LETTER_QUEUE_
 from metropolis.lua_scripts import COMPLETE_JOB_SCRIPT
 import logging
 from .log_config import setup_logging
+from metropolis.metrics import JOBS_PROCESSED_COUNTER
+
+
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+prom_multiproc_dir = os.environ.get("prometheus_multiproc_dir")
+if prom_multiproc_dir:
+    logger.info(
+        "Prometheus multi-process mode is active.",
+        extra={"path": prom_multiproc_dir}
+    )
+    # Ensure the directory exists inside the container
+    os.makedirs(prom_multiproc_dir, exist_ok=True)
+else:
+    logger.warning("Prometheus multi-process mode is not configured. Metrics will not be shared.")
+
 
 LOCK_TTL_SECONDS = 300  # 5 minutes
 HEARTBEAT_INTERVAL_SECONDS = 60 # 1 minute:
@@ -57,19 +72,8 @@ def run_worker():
             lock_key = f"metropolis:job:{job_id}:lock"
             worker_id = f"worker-{os.getpid()}"
             logger.info(f"Received job", extra={"job_id": job_id})
-            if not job:
-                logger.warning("Job not found in database", extra={"job_id": job_id})
-                continue
 
-            logger.info(
-                "Starting task",
-                extra={
-                    "job_id": job.id,
-                    "run_id": job.pipeline_run_id,
-                    "task_id": job.task_id,
-                    "attempt": job.retry_count + 1
-                }
-            )
+
 
             if not redis_client.set(lock_key, worker_id, ex=LOCK_TTL_SECONDS, nx=True):
                 logger.warning(f"[-] Could not acquire lock for job {job_id}. Another worker took it. Skipping.")
@@ -88,6 +92,16 @@ def run_worker():
             if not job:
                 logger.info(f"[!] Error: Job with ID {job_id} not found. Skipping.")
                 continue
+
+            logger.info(
+                "Starting task",
+                extra={
+                    "job_id": job.id,
+                    "run_id": job.pipeline_run_id,
+                    "task_id": job.task_id,
+                    "attempt": job.retry_count + 1
+                }
+            )
 
             job.status = models.JobStatus.RUNNING
             db.commit()
@@ -112,6 +126,8 @@ def run_worker():
 
             job.status = models.JobStatus.SUCCESS
             db.commit()
+
+            JOBS_PROCESSED_COUNTER.labels(final_status='success').inc()
 
             jobs_remaining_key = f"metropolis:run:{run_id}:jobs_count"
             jobs_left = redis_client.decr(jobs_remaining_key)
@@ -139,6 +155,7 @@ def run_worker():
                     job.logs = str(e)
                     job.pipeline_run.status = models.PipelineRunStatus.FAILED
                     redis_client.lpush(DEAD_LETTER_QUEUE_NAME,job.id)
+                    JOBS_PROCESSED_COUNTER.labels(final_status='failed').inc()
                 else:
                     delay = RETRY_DELAY_BASE_SECONDS * (2 ** (job.retry_count - 1))
                     retry_time_stamp = int(time.time()+delay)

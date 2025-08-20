@@ -1,0 +1,11 @@
+# monitoring/prometheus/prometheus.yml (New, More Robust Version)
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'metropolis-api'
+    # This tells Prometheus to use Docker's internal DNS to find the container
+    # named 'api' on the port '8000'. This is very reliable.
+    static_configs:
+      - targets: ['api:8000']

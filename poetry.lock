@@ -381,6 +381,21 @@ files = [
 ]
 
 [[package]]
+name = "prometheus-client"
+version = "0.22.1"
+description = "Python client for the Prometheus monitoring system."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "prometheus_client-0.22.1-py3-none-any.whl", hash = "sha256:cca895342e308174341b2cbf99a56bef291fbc0ef7b9e5412a0f26d653ba7094"},
+    {file = "prometheus_client-0.22.1.tar.gz", hash = "sha256:190f1331e783cf21eb60bca559354e0a4d4378facecf78f5428c39b675d20d28"},
+]
+
+[package.extras]
+twisted = ["twisted"]
+
+[[package]]
 name = "psycopg2-binary"
 version = "2.9.10"
 description = "psycopg2 - Python-PostgreSQL Database Adapter"
@@ -856,6 +871,22 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "starlette-prometheus"
+version = "0.10.0"
+description = "Prometheus integration for Starlette"
+optional = false
+python-versions = "<4.0,>=3.8"
+groups = ["main"]
+files = [
+    {file = "starlette_prometheus-0.10.0-py3-none-any.whl", hash = "sha256:8b2f997495f809f01387378dad5476b2a1cf2fb2d9b96164394effdecb2d8380"},
+    {file = "starlette_prometheus-0.10.0.tar.gz", hash = "sha256:77d1e9cfad572206e8de242975bd00a62e33685eb330389f2add04e4d719d47d"},
+]
+
+[package.dependencies]
+prometheus_client = ">=0.12"
+starlette = ">=0.12.2"
+
+[[package]]
 name = "tomli"
 version = "2.2.1"
 description = "A lil' TOML parser"
@@ -1206,4 +1237,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "8abd7541830533dd526702acf6e488fe0dbab901c3ccc223cea008cd5cac7cbe"
+content-hash = "8f4cce80095797372f5710966093c6580ccc664f9b6438d907e9d1f5aece52c2"

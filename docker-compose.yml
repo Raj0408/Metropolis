@@ -39,9 +39,11 @@ services:
       - "8000:8000"
     volumes:
       - ./src:/app/src
+      - ./prometheus-multiproc-dir:/prometheus_multiproc_dir
     env_file:
       - .env
     environment:
+      - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=api
     depends_on:
       - postgres
@@ -53,9 +55,11 @@ services:
       dockerfile: Dockerfile.worker
     volumes:
       - ./src:/app/src
+      - ./prometheus-multiproc-dir:/prometheus_multiproc_dir
     env_file:
       - .env
     environment:
+      - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=worker
     depends_on:
       - postgres
@@ -67,14 +71,38 @@ services:
       dockerfile: Dockerfile.janitor
     volumes:
       - ./src:/app/src
+      - ./prometheus-multiproc-dir:/prometheus_multiproc_dir
     env_file:
       - .env
     environment:
+      - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=janitor
     depends_on:
       - postgres
       - redis
-
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: metropolis-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      # Mount our prometheus config file
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    depends_on:
+      - api
+      
+  grafana:
+    image: grafana/grafana-oss:9.5.3
+    container_name: metropolis-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount our provisioning files to auto-configure the datasource
+      - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/
+    depends_on:
+      - prometheus
 volumes:
   postgres_data:
       driver: local

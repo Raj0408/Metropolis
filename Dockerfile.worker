@@ -1,8 +1,8 @@
-FROM python:3.10-slim
+FROM python:3.10 as builder
 
 WORKDIR /app
 
-RUN pip install --upgrade pip
+ENV PATH="/root/.local/bin:$PATH"
 
 COPY pyproject.toml poetry.lock ./
 
@@ -10,8 +10,22 @@ RUN pip install poetry poetry-plugin-export
 
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m venv /opt/venv
 
-COPY ./src ./src
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY --from=builder /opt/venv /opt/venv
+
+COPY ./src /app/src
+
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN useradd -m metropolis_user
+
+USER metropolis_user
 
 CMD ["python", "-u", "-m", "src.metropolis.worker"]

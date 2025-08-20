@@ -9,6 +9,9 @@ from .schemas import PipelineCreate,Pipeline,PipelineGet,PipelineRunCreate
 from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run,get_pipeline_run
 from .validation import validate_pipeline_dag
 from .broker import redis_client,READY_QUEUE_NAME
+from prometheus_client import make_asgi_app
+from prometheus_client import Counter, Gauge 
+from . import metrics
 import logging
 from .log_config import setup_logging
 
@@ -33,6 +36,11 @@ for attempt in range(max_retries):
             print("Could not connect to the database after several attempts. Exiting.")
 
 app = FastAPI(title="Metropolis - Pipeline Orchestrator")
+
+metrics_app = make_asgi_app()
+
+
+app.mount("/metrics", metrics_app)
 
 @app.get("/")
 def read_root():

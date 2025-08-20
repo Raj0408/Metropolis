@@ -10,6 +10,8 @@ from metropolis import models, crud
 from metropolis.database import SessionLocal
 from metropolis.broker import redis_client, READY_QUEUE_NAME, DELAYED_QUEUE_NAME
 import logging
+from metropolis.broker import READY_QUEUE_NAME, DELAYED_QUEUE_NAME 
+from metropolis.metrics import READY_QUEUE_GAUGE, DELAYED_QUEUE_GAUGE 
 from .log_config import setup_logging
 
 setup_logging()
@@ -20,6 +22,22 @@ def get_db() -> sqlalchemy.orm.Session:
 
 
 janitor_time = 30 #30 Sec for now
+
+def update_queue_metrics():
+    """Updates Prometheus gauges for queue depths."""
+    try:
+        ready_queue_depth = redis_client.llen(READY_QUEUE_NAME)
+        READY_QUEUE_GAUGE.set(ready_queue_depth)
+        
+        delayed_queue_depth = redis_client.zcard(DELAYED_QUEUE_NAME)
+        DELAYED_QUEUE_GAUGE.set(delayed_queue_depth)
+        
+        logger.info(
+            "Updated queue metrics", 
+            extra={"ready_queue": ready_queue_depth, "delayed_queue": delayed_queue_depth}
+        )
+    except Exception as e:
+        logger.error("Failed to update queue metrics", extra={"error": str(e)})
 
 def zombie_job_checker():
     logger.info("Checking for zombie jobs...")
@@ -80,6 +98,7 @@ def run_janitor():
     while True:
             zombie_job_checker()
             requeue_delayed_jobs()
+            update_queue_metrics() 
             logger.info("Janitor cycle complete. Sleeping for 60 seconds.")
             time.sleep(janitor_time)
 
