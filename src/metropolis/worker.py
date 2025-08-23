@@ -16,7 +16,6 @@ from metropolis.broker import redis_client, READY_QUEUE_NAME, DEAD_LETTER_QUEUE_
 from metropolis.lua_scripts import COMPLETE_JOB_SCRIPT
 import logging
 from .log_config import setup_logging
-from metropolis.metrics import JOBS_PROCESSED_COUNTER
 
 
 
@@ -127,7 +126,10 @@ def run_worker():
             job.status = models.JobStatus.SUCCESS
             db.commit()
 
-            JOBS_PROCESSED_COUNTER.labels(final_status='success').inc()
+            redis_client.hincrby("metropolis:metrics", "jobs_processed_success_total", 1)
+            
+            print(f"updating job processed counter")
+           
 
             jobs_remaining_key = f"metropolis:run:{run_id}:jobs_count"
             jobs_left = redis_client.decr(jobs_remaining_key)
@@ -155,7 +157,8 @@ def run_worker():
                     job.logs = str(e)
                     job.pipeline_run.status = models.PipelineRunStatus.FAILED
                     redis_client.lpush(DEAD_LETTER_QUEUE_NAME,job.id)
-                    JOBS_PROCESSED_COUNTER.labels(final_status='failed').inc()
+                    redis_client.hincrby("metropolis:metrics", "jobs_processed_failed_total", 1)
+                    
                 else:
                     delay = RETRY_DELAY_BASE_SECONDS * (2 ** (job.retry_count - 1))
                     retry_time_stamp = int(time.time()+delay)
@@ -173,7 +176,8 @@ def run_worker():
                 heartbeat_thread.join()
             
             if lock_key:
-                logger.info(f"    -> Releasing lock for job" ,extra={"job_id" : job.id})
+                job_id_for_logging = job.id if job else job_id_str
+                logger.info(f"Releasing lock for job", extra={"job_id": job_id_for_logging})
                 redis_client.delete(lock_key)
 
             if db:

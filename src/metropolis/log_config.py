@@ -4,8 +4,6 @@ import logging
 import logging.config
 import os
 
-# Get the service name from an environment variable, with a default.
-# We will set this variable in our docker-compose.yml file.
 SERVICE_NAME = os.environ.get("METROPOLIS_SERVICE_NAME", "metropolis_app")
 
 LOGGING_CONFIG = {

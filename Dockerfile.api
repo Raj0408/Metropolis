@@ -24,8 +24,4 @@ COPY ./src /app/src
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN useradd -m metropolis_user
-
-USER metropolis_user
-
 CMD ["uvicorn", "src.metropolis.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

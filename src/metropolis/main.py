@@ -9,11 +9,9 @@ from .schemas import PipelineCreate,Pipeline,PipelineGet,PipelineRunCreate
 from .crud import get_pipeline_by_name,create_pipeline,get_pipeline_by_id,create_pipeline_run,get_pipeline_run
 from .validation import validate_pipeline_dag
 from .broker import redis_client,READY_QUEUE_NAME
-from prometheus_client import make_asgi_app
-from prometheus_client import Counter, Gauge 
-from . import metrics
 import logging
 from .log_config import setup_logging
+import os
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -37,10 +35,6 @@ for attempt in range(max_retries):
 
 app = FastAPI(title="Metropolis - Pipeline Orchestrator")
 
-metrics_app = make_asgi_app()
-
-
-app.mount("/metrics", metrics_app)
 
 @app.get("/")
 def read_root():
@@ -156,3 +150,36 @@ def trigger_pipeline_run(pipeline_id:int,run_in:PipelineRunCreate,db:Session = D
 
 
     return pipeline_run
+
+@app.get("/debug-metrics-dir")
+def debug_metrics_dir():
+    """
+    Lists the contents of the prometheus multi-process directory
+    and tries to read the contents of the first text file it finds.
+    """
+    prom_dir = os.environ.get("prometheus_multiproc_dir")
+    if not prom_dir or not os.path.isdir(prom_dir):
+        return {"error": "prometheus_multiproc_dir not found or not a directory", "path": prom_dir}
+
+    try:
+        files = os.listdir(prom_dir)
+        
+        first_txt_file = None
+        for f in files:
+            if f.endswith(".txt"):
+                first_txt_file = f
+                break
+        
+        content = None
+        if first_txt_file:
+            with open(os.path.join(prom_dir, first_txt_file), "r") as f:
+                content = f.read()
+
+        return {
+            "message": "Successfully scanned directory.",
+            "directory": prom_dir,
+            "files": files,
+            "first_txt_file_content": content
+        }
+    except Exception as e:
+        return {"error": "Failed to read directory or files", "details": str(e)}
