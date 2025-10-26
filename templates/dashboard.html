@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-blue-600">Metropolis AI</h1>
+                    </div>
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="/" class="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                        <a href="/workflows" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Workflows</a>
+                        <a href="/monitoring" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Monitoring</a>
+                        <a href="/analytics" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Analytics</a>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <div class="flex items-center space-x-4">
+                        <div class="relative">
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                                <i class="fas fa-plus mr-2"></i>New Workflow
+                            </button>
+                        </div>
+                        <div class="relative">
+                            <button class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">
+                                <i class="fas fa-user mr-2"></i>Profile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p class="mt-2 text-gray-600">Monitor your AI workflows and system performance</p>
+        </div>
+
+        <!-- System Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-project-diagram text-blue-500 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Active Workflows</dt>
+                                <dd class="text-lg font-medium text-gray-900" id="active-workflows">-</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-tasks text-green-500 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Running Tasks</dt>
+                                <dd class="text-lg font-medium text-gray-900" id="running-tasks">-</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-chart-line text-purple-500 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">Success Rate</dt>
+                                <dd class="text-lg font-medium text-gray-900" id="success-rate">-</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-server text-orange-500 text-2xl"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">System Load</dt>
+                                <dd class="text-lg font-medium text-gray-900" id="system-load">-</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Performance Chart -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">System Performance</h3>
+                <canvas id="performanceChart" width="400" height="200"></canvas>
+            </div>
+
+            <!-- Workflow Status Chart -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Workflow Status</h3>
+                <canvas id="workflowStatusChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
+            </div>
+            <div class="divide-y divide-gray-200">
+                <div id="recent-activity" class="p-6">
+                    <!-- Recent activity items will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize dashboard
+        let performanceChart, workflowStatusChart;
+        
+        async function loadDashboardData() {
+            try {
+                const response = await axios.get('/api/dashboard/overview');
+                const data = response.data;
+                
+                // Update metrics
+                document.getElementById('active-workflows').textContent = data.active_workflows;
+                document.getElementById('running-tasks').textContent = data.system_metrics.running_tasks;
+                document.getElementById('success-rate').textContent = '95%'; // Calculate from data
+                document.getElementById('system-load').textContent = Math.round(data.system_metrics.cpu_usage) + '%';
+                
+                // Update recent activity
+                updateRecentActivity(data.recent_runs);
+                
+                // Update charts
+                updatePerformanceChart(data.system_metrics);
+                updateWorkflowStatusChart(data);
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+        
+        function updateRecentActivity(runs) {
+            const container = document.getElementById('recent-activity');
+            container.innerHTML = runs.map(run => `
+                <div class="flex items-center py-3">
+                    <div class="flex-shrink-0">
+                        <div class="w-2 h-2 bg-${getStatusColor(run.status)}-500 rounded-full"></div>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-gray-900">Workflow run ${run.id.substring(0, 8)}...</p>
+                        <p class="text-sm text-gray-500">Status: ${run.status} • ${new Date(run.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function getStatusColor(status) {
+            switch(status) {
+                case 'SUCCESS': return 'green';
+                case 'RUNNING': return 'blue';
+                case 'FAILED': return 'red';
+                default: return 'gray';
+            }
+        }
+        
+        function updatePerformanceChart(metrics) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            if (performanceChart) {
+                performanceChart.destroy();
+            }
+            
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['CPU', 'Memory', 'Disk', 'Network'],
+                    datasets: [{
+                        label: 'Usage %',
+                        data: [
+                            metrics.cpu_usage,
+                            metrics.memory_usage,
+                            metrics.system_load,
+                            0 // Network not available in current metrics
+                        ],
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateWorkflowStatusChart(data) {
+            const ctx = document.getElementById('workflowStatusChart').getContext('2d');
+            
+            if (workflowStatusChart) {
+                workflowStatusChart.destroy();
+            }
+            
+            workflowStatusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Success', 'Running', 'Failed', 'Pending'],
+                    datasets: [{
+                        data: [
+                            data.system_metrics.active_workflows,
+                            data.system_metrics.running_tasks,
+                            data.system_metrics.failed_tasks,
+                            data.system_metrics.queued_tasks
+                        ],
+                        backgroundColor: [
+                            'rgba(34, 197, 94, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            
+            // Refresh data every 30 seconds
+            setInterval(loadDashboardData, 30000);
+        });
+    </script>
+</body>
+</html>

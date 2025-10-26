@@ -24,4 +24,4 @@ COPY ./src /app/src
 
 ENV PATH="/opt/venv/bin:$PATH"
 
-CMD ["uvicorn", "src.metropolis.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "src.metropolis.enhanced_api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+  # Database
   postgres:
     image: postgres:15-alpine
     container_name: metropolis-postgres
@@ -18,18 +17,41 @@ services:
       timeout: 5s
       retries: 5
   
+  # Redis Cache & Message Broker
   redis:
     image: redis:7-alpine
-    container_name: metropolis_redis
+    container_name: metropolis-redis
     ports:
       - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli","ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-  
 
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: metropolis-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=metropolis
+      - MINIO_ROOT_PASSWORD=metropolis123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Main API Service
   api:
     container_name: metropolis-api
     build: 
@@ -40,16 +62,27 @@ services:
     volumes:
       - ./src:/app/src
       - ./prometheus-multiproc-dir:/prometheus_multiproc_dir
+      - ./templates:/app/templates
+      - ./static:/app/static
     env_file:
       - .env
     environment:
       - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=api
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=metropolis
+      - MINIO_SECRET_KEY=metropolis123
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Worker Service (scaled without container_name)
   worker:
-    container_name: metropolis-worker
     build:
       context: .
       dockerfile: Dockerfile.worker
@@ -61,9 +94,21 @@ services:
     environment:
       - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=worker
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=metropolis
+      - MINIO_SECRET_KEY=metropolis123
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+
+  # Janitor Service
   janitor:
     container_name: metropolis-janitor
     build:
@@ -78,8 +123,13 @@ services:
       - prometheus_multiproc_dir=/prometheus_multiproc_dir
       - METROPOLIS_SERVICE_NAME=janitor
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Monitoring Services
   prometheus:
     image: prom/prometheus:v2.45.0
     container_name: metropolis-prometheus
@@ -87,11 +137,18 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
     depends_on:
       - api
-  
+    restart: unless-stopped
+
   redis_exporter:
     image: oliver006/redis_exporter:v1.55.0
     container_name: metropolis-redis-exporter
@@ -103,6 +160,24 @@ services:
       - ./monitoring/redis_exporter:/scripts
     depends_on:
       - redis
+    restart: unless-stopped
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: metropolis-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana-oss:9.5.3
     container_name: metropolis-grafana
@@ -110,10 +185,75 @@ services:
       - "3000:3000"
     volumes:
       - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
+    restart: unless-stopped
+
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: metropolis-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Elasticsearch for Logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: metropolis-elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  # Kibana for Log Visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: metropolis-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # Jaeger for Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: metropolis-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+
 volumes:
   postgres_data:
-      driver: local
-           
-
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local

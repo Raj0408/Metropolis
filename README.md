@@ -1,100 +1,354 @@
-# Metropolis 🏙️
+# Metropolis AI Platform 🏙️
 
-**Metropolis** is a robust, production-grade platform for orchestrating complex data engineering and machine learning pipelines. It is built from the ground up on the principle of "Design for Failure," focusing on resilience, observability, and fault-tolerance.
+**Metropolis** is a world-class, production-ready AI workflow orchestration platform that enables users to create, manage, and monitor complex AI workflows with enterprise-grade reliability, real-time monitoring, and advanced analytics.
 
-This project is a deep dive into the engineering principles behind modern distributed systems, serving as a practical masterclass in building reliable, containerized applications.
+## 🌟 Key Features
 
----
+### 🚀 **Advanced AI Workflow Engine**
+- **Visual Workflow Builder**: Drag-and-drop interface for creating AI workflows
+- **Node-Based Architecture**: Connect AI tools, data processors, and custom components
+- **Intelligent Execution**: Optimized execution strategies with adaptive resource management
+- **Real-time Monitoring**: Live status updates and performance tracking
 
-## Architecture Overview
+### 🤖 **AI Tools Marketplace**
+- **Pre-built Integrations**: OpenAI, Hugging Face, Google AI, and more
+- **Custom AI Tools**: Build and deploy your own AI components
+- **Tool Categories**: Language Models, Computer Vision, Audio Processing, Data Analysis
+- **Easy Integration**: One-click deployment of AI tools into workflows
 
-Metropolis is built on a microservices-style architecture, with clear separation of concerns between components. All services are containerized with Docker for portability and production-readiness.
+### 📊 **Enterprise Monitoring & Analytics**
+- **Real-time Dashboards**: Beautiful, responsive web interface
+- **Advanced Metrics**: System performance, workflow analytics, and usage statistics
+- **Alerting System**: Intelligent alerts for failures, performance issues, and system health
+- **Distributed Tracing**: End-to-end request tracing with Jaeger integration
 
-1.  **Orchestration API (FastAPI):** The public-facing entry point. It handles:
-    *   Pipeline definition submission and validation (ensuring it's a valid DAG).
-    *   Triggering and parameterizing pipeline runs.
-    *   Persisting all definitive state to the PostgreSQL database.
-    *   Enqueuing the initial "root" jobs into Redis.
+### 🔒 **Enterprise Security**
+- **Authentication & Authorization**: JWT-based API keys and user management
+- **Audit Logging**: Comprehensive audit trails for all operations
+- **Data Encryption**: End-to-end encryption for sensitive data
+- **Role-based Access Control**: Fine-grained permissions system
 
-2.  **Permanent State / Source of Truth (PostgreSQL):**
-    *   Stores immutable pipeline definitions, historical logs of all pipeline runs, and final job results. Designed for data integrity and relational consistency.
+### ⚡ **High Performance & Scalability**
+- **Horizontal Scaling**: Auto-scaling worker nodes based on demand
+- **Load Balancing**: Intelligent request distribution
+- **Caching**: Redis-based caching for optimal performance
+- **Object Storage**: MinIO S3-compatible storage for large artifacts
 
-3.  **Broker / "Hot" State (Redis):**
-    *   Manages the high-speed operational state: the queue of jobs ready for execution (`ready_queue`), real-time status of running jobs, job locks, and Dead Letter Queues (DLQ).
+## 🏗️ Architecture Overview
 
-4.  **Artifact Store (MinIO):**
-    *   An S3-compatible object storage for large data artifacts (e.g., datasets, trained models, evaluation reports) passed between tasks.
+Metropolis is built on a modern microservices architecture with the following components:
 
-5.  **Worker Fleet (Python):**
-    *   A pool of identical, stateless consumer processes that execute the actual pipeline tasks. They are designed to be resilient, handle errors with retries, and perform atomic state transitions using Redis Lua scripts.
+### Core Services
+- **API Gateway**: FastAPI-based REST API with comprehensive documentation
+- **Workflow Engine**: Advanced AI workflow execution with intelligent optimization
+- **Worker Fleet**: Scalable task execution with automatic failover
+- **Monitoring Stack**: Prometheus, Grafana, and custom metrics
+- **Message Broker**: Redis for high-performance task queuing
 
-6.  **Support Services (Python):**
-    *   **Janitor:** A "reaper" process that finds and requeues jobs whose locks have expired due to a worker crash.
-    *   **Scheduler:** (Future) A cron-based service for triggering time-based pipeline runs.
+### Data Layer
+- **PostgreSQL**: Primary database for workflows, users, and metadata
+- **Redis**: High-speed caching and message queuing
+- **MinIO**: S3-compatible object storage for artifacts
+- **Elasticsearch**: Log aggregation and search
 
----
+### Monitoring & Observability
+- **Prometheus**: Metrics collection and storage
+- **Grafana**: Visualization and dashboards
+- **Jaeger**: Distributed tracing
+- **Kibana**: Log analysis and visualization
 
-## Technology Stack
-
-*   **Language:** Python 3.10+
-*   **API Framework:** FastAPI
-*   **Permanent State:** PostgreSQL
-*   **Broker & Cache:** Redis
-*   **Artifact Store:** MinIO (S3-compatible)
-*   **Orchestration:** Docker & Docker Compose
-*   **Database Migrations:** Alembic
-*   **Data Schemas:** Pydantic
-
----
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
+- Docker & Docker Compose
+- Python 3.10+ (for local development)
+- 8GB+ RAM recommended
 
-*   Docker
-*   Docker Compose
-*   Python 3.10+ (for local development, if not using Docker exclusively)
+### Installation
 
-### Installation & Setup
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yraj0408/metropolis.git
+   cd metropolis
+   ```
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/yraj0408/metropolis.git
-    cd metropolis
-    ```
+2. **Create environment file:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-2.  **Configure Environment Variables:**
-    The application uses environment variables for configuration. Create a `.env` file from the example.
-    ```bash
-    # This step will be added once we define the settings.
-    # For now, this is a placeholder.
-    cp .env.example .env
-    ```
-    *Note: The `.env` file is for local development and is excluded from Git via `.gitignore`.*
+3. **Start the platform:**
+   ```bash
+   docker-compose up --build
+   ```
 
-3.  **Build and Run the Services:**
-    Use Docker Compose to build the images and start all the services.
-    ```bash
-    docker-compose up --build
-    ```
+4. **Access the services:**
+   - **API Documentation**: http://localhost:8000/docs
+   - **Web Dashboard**: http://localhost:8000
+   - **Grafana**: http://localhost:3000 (admin/admin)
+   - **Prometheus**: http://localhost:9090
+   - **MinIO Console**: http://localhost:9001
 
-4.  **Verify the API:**
-    Once the containers are running, you can access the interactive API documentation (powered by Swagger UI) at:
-    [http://localhost:8000/docs](http://localhost:8000/docs)
+## 📖 Usage Examples
+
+### Creating Your First AI Workflow
+
+```python
+from metropolis import MetropolisClient
+
+# Initialize client
+client = MetropolisClient(api_key="your-api-key")
+
+# Create a workflow
+workflow = client.create_workflow(
+    name="Sentiment Analysis Pipeline",
+    description="Analyze sentiment of customer feedback",
+    nodes=[
+        {
+            "id": "text_input",
+            "type": "DATA_PROCESSOR",
+            "name": "Text Input",
+            "config": {"input_type": "text"}
+        },
+        {
+            "id": "sentiment_analysis",
+            "type": "AI_MODEL",
+            "name": "Sentiment Analysis",
+            "config": {
+                "model": "huggingface/sentiment-analysis",
+                "provider": "Hugging Face"
+            }
+        }
+    ],
+    connections=[
+        {
+            "source": "text_input",
+            "target": "sentiment_analysis"
+        }
+    ]
+)
+
+# Run the workflow
+result = client.run_workflow(
+    workflow_id=workflow.id,
+    parameters={"text": "I love this product!"}
+)
+```
+
+### Real-time Monitoring
+
+```python
+# Get workflow status
+status = client.get_workflow_status(workflow_id, run_id)
+print(f"Progress: {status.progress}%")
+print(f"Status: {status.status}")
+
+# Stream real-time logs
+for log in client.stream_workflow_logs(workflow_id, run_id):
+    print(f"[{log.timestamp}] {log.level}: {log.message}")
+```
+
+## 🛠️ Development
+
+### Local Development Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Set up database:**
+   ```bash
+   alembic upgrade head
+   ```
+
+3. **Run tests:**
+   ```bash
+   pytest tests/
+   ```
+
+4. **Start development server:**
+   ```bash
+   uvicorn src.metropolis.main:app --reload
+   ```
+
+### Adding Custom AI Tools
+
+```python
+from metropolis.ai_tools_marketplace import AIToolsMarketplace
+
+# Create custom tool
+tool = marketplace.create_custom_tool(
+    name="Custom Text Processor",
+    description="Process text with custom logic",
+    category="Data Processing",
+    provider="Custom",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "operation": {"type": "string", "enum": ["uppercase", "lowercase"]}
+        }
+    },
+    input_schema={
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"}
+        }
+    },
+    output_schema={
+        "type": "object",
+        "properties": {
+            "processed_text": {"type": "string"}
+        }
+    }
+)
+```
+
+## 📊 Monitoring & Analytics
+
+### System Metrics
+- **CPU Usage**: Real-time CPU utilization
+- **Memory Usage**: Memory consumption tracking
+- **Network I/O**: Network traffic monitoring
+- **Disk Usage**: Storage utilization
+
+### Workflow Analytics
+- **Success Rate**: Workflow completion statistics
+- **Performance Metrics**: Execution time and resource usage
+- **Error Analysis**: Failure patterns and debugging
+- **Usage Trends**: Popular workflows and tools
+
+### Alerting
+- **System Alerts**: High CPU, memory, or disk usage
+- **Workflow Alerts**: Failed workflows and stuck tasks
+- **Performance Alerts**: Slow execution and bottlenecks
+- **Custom Alerts**: User-defined alert conditions
+
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+# Database
+POSTGRES_USER=metropolis
+POSTGRES_PASSWORD=metropolis
+POSTGRES_SERVER=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=metropolis_db
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# MinIO
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=metropolis
+MINIO_SECRET_KEY=metropolis123
+
+# Monitoring
+PROMETHEUS_MULTIPROC_DIR=/prometheus_multiproc_dir
+```
+
+### Scaling Configuration
+
+```yaml
+# docker-compose.yml
+services:
+  worker:
+    deploy:
+      replicas: 5  # Scale workers
+    environment:
+      - WORKER_CONCURRENCY=10  # Tasks per worker
+```
+
+## 🚀 Deployment
+
+### Production Deployment
+
+1. **Use production Docker images:**
+   ```bash
+   docker-compose -f docker-compose.prod.yml up -d
+   ```
+
+2. **Configure load balancer:**
+   ```nginx
+   upstream metropolis_api {
+       server api1:8000;
+       server api2:8000;
+       server api3:8000;
+   }
+   ```
+
+3. **Set up monitoring:**
+   - Configure Prometheus alerts
+   - Set up Grafana dashboards
+   - Configure log aggregation
+
+### Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metropolis-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: metropolis-api
+  template:
+    spec:
+      containers:
+      - name: api
+        image: metropolis/api:latest
+        ports:
+        - containerPort: 8000
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+- **Documentation**: [docs.metropolis.ai](https://docs.metropolis.ai)
+- **Issues**: [GitHub Issues](https://github.com/yraj0408/metropolis/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yraj0408/metropolis/discussions)
+- **Email**: support@metropolis.ai
+
+## 🎯 Roadmap
+
+### Q1 2024
+- [ ] Advanced workflow templates
+- [ ] Multi-tenant support
+- [ ] Advanced scheduling
+- [ ] Workflow versioning
+
+### Q2 2024
+- [ ] Machine learning model training workflows
+- [ ] Advanced data connectors
+- [ ] Workflow marketplace
+- [ ] Enterprise SSO integration
+
+### Q3 2024
+- [ ] Real-time collaboration
+- [ ] Advanced analytics
+- [ ] Workflow optimization suggestions
+- [ ] Mobile app
 
 ---
 
-## Project Roadmap
-
-This project is being developed in distinct phases:
-
-*   **Phase 1: The Unshakeable Core:** Build the API with robust DAG validation and persistence. Set up the core PostgreSQL and Redis layers. A submitted pipeline correctly enqueues its root nodes.
-*   **Phase 2: The Resilient Worker & Atomic Transitions:** Implement the worker logic, atomic completion scripts (Lua), error handling, retries, and the Dead Letter Queue.
-*   **Phase 3: Observability and Production Readiness:** Implement heartbeating/locking, the "Janitor" service, structured logging, metrics (Prometheus), and status-checking endpoints.
-*   **Phase 4: The Advanced Orchestrator:** Add features like time-based scheduling, a simple UI, and distributed tracing.
-
----
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+**Built with ❤️ by the Metropolis Team**

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <h1 class="text-2xl font-bold text-blue-600">Metropolis AI</h1>
+                    </div>
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="/" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
+                        <a href="/workflows" class="text-gray-900 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Workflows</a>
+                        <a href="/monitoring" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Monitoring</a>
+                        <a href="/analytics" class="text-gray-500 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">Analytics</a>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <button class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700" onclick="createWorkflow()">
+                        <i class="fas fa-plus mr-2"></i>New Workflow
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900">Workflows</h1>
+            <p class="mt-2 text-gray-600">Create and manage your AI workflows</p>
+        </div>
+
+        <!-- Filters and Search -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Search workflows..." 
+                               class="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                    </div>
+                    <select id="status-filter" class="px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">All Status</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="PUBLISHED">Published</option>
+                        <option value="ARCHIVED">Archived</option>
+                    </select>
+                </div>
+                <div class="mt-4 sm:mt-0">
+                    <button class="bg-gray-200 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-300">
+                        <i class="fas fa-download mr-2"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Workflows Grid -->
+        <div id="workflows-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Workflow cards will be loaded here -->
+        </div>
+
+        <!-- Load More Button -->
+        <div class="mt-8 text-center">
+            <button id="load-more-btn" class="bg-blue-600 text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-blue-700">
+                Load More
+            </button>
+        </div>
+    </div>
+
+    <!-- Create Workflow Modal -->
+    <div id="create-workflow-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Create New Workflow</h3>
+                </div>
+                <form id="create-workflow-form" class="p-6">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Workflow Name</label>
+                        <input type="text" name="name" required 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea name="description" rows="3" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                        <input type="text" name="tags" placeholder="Enter tags separated by commas" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="is_public" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">Make this workflow public</span>
+                        </label>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" onclick="closeCreateModal()" 
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                            Create Workflow
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let workflows = [];
+        let currentPage = 0;
+        const pageSize = 12;
+
+        async function loadWorkflows() {
+            try {
+                const response = await axios.get(`/api/dashboard/workflows?skip=${currentPage * pageSize}&limit=${pageSize}`);
+                const newWorkflows = response.data;
+                
+                if (currentPage === 0) {
+                    workflows = newWorkflows;
+                } else {
+                    workflows = [...workflows, ...newWorkflows];
+                }
+                
+                renderWorkflows();
+                
+                // Hide load more button if no more workflows
+                if (newWorkflows.length < pageSize) {
+                    document.getElementById('load-more-btn').style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error loading workflows:', error);
+            }
+        }
+
+        function renderWorkflows() {
+            const container = document.getElementById('workflows-container');
+            
+            if (workflows.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-project-diagram text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">No workflows found</h3>
+                        <p class="text-gray-500 mb-4">Get started by creating your first workflow</p>
+                        <button onclick="createWorkflow()" class="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                            Create Workflow
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = workflows.map(workflow => `
+                <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200">
+                    <div class="p-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-1">${workflow.name}</h3>
+                                <p class="text-sm text-gray-600 mb-2">${workflow.description || 'No description'}</p>
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(workflow.status)}">
+                                        ${workflow.status}
+                                    </span>
+                                    ${workflow.is_public ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Public</span>' : ''}
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="editWorkflow('${workflow.id}')" class="text-gray-400 hover:text-gray-600">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteWorkflow('${workflow.id}')" class="text-gray-400 hover:text-red-600">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm text-gray-500">
+                            <span>Created ${new Date(workflow.created_at).toLocaleDateString()}</span>
+                            <div class="flex items-center space-x-3">
+                                <button onclick="runWorkflow('${workflow.id}')" class="text-blue-600 hover:text-blue-800 font-medium">
+                                    <i class="fas fa-play mr-1"></i>Run
+                                </button>
+                                <button onclick="viewWorkflow('${workflow.id}')" class="text-gray-600 hover:text-gray-800 font-medium">
+                                    <i class="fas fa-eye mr-1"></i>View
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'PUBLISHED': return 'bg-green-100 text-green-800';
+                case 'DRAFT': return 'bg-yellow-100 text-yellow-800';
+                case 'ARCHIVED': return 'bg-gray-100 text-gray-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function createWorkflow() {
+            document.getElementById('create-workflow-modal').classList.remove('hidden');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-workflow-modal').classList.add('hidden');
+            document.getElementById('create-workflow-form').reset();
+        }
+
+        function editWorkflow(workflowId) {
+            // Implementation for editing workflow
+            console.log('Edit workflow:', workflowId);
+        }
+
+        function deleteWorkflow(workflowId) {
+            if (confirm('Are you sure you want to delete this workflow?')) {
+                // Implementation for deleting workflow
+                console.log('Delete workflow:', workflowId);
+            }
+        }
+
+        function runWorkflow(workflowId) {
+            // Implementation for running workflow
+            console.log('Run workflow:', workflowId);
+        }
+
+        function viewWorkflow(workflowId) {
+            window.location.href = `/workflows/${workflowId}`;
+        }
+
+        // Search functionality
+        document.getElementById('search-input').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredWorkflows = workflows.filter(workflow => 
+                workflow.name.toLowerCase().includes(searchTerm) ||
+                (workflow.description && workflow.description.toLowerCase().includes(searchTerm))
+            );
+            
+            // Temporarily replace workflows for filtering
+            const originalWorkflows = workflows;
+            workflows = filteredWorkflows;
+            renderWorkflows();
+            workflows = originalWorkflows;
+        });
+
+        // Status filter
+        document.getElementById('status-filter').addEventListener('change', function(e) {
+            const status = e.target.value;
+            const filteredWorkflows = status ? 
+                workflows.filter(workflow => workflow.status === status) : 
+                workflows;
+            
+            // Temporarily replace workflows for filtering
+            const originalWorkflows = workflows;
+            workflows = filteredWorkflows;
+            renderWorkflows();
+            workflows = originalWorkflows;
+        });
+
+        // Load more functionality
+        document.getElementById('load-more-btn').addEventListener('click', function() {
+            currentPage++;
+            loadWorkflows();
+        });
+
+        // Create workflow form submission
+        document.getElementById('create-workflow-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const workflowData = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                tags: formData.get('tags').split(',').map(tag => tag.trim()).filter(tag => tag),
+                is_public: formData.get('is_public') === 'on',
+                definition: {},
+                nodes: [],
+                connections: []
+            };
+            
+            try {
+                // Here you would make an API call to create the workflow
+                console.log('Creating workflow:', workflowData);
+                closeCreateModal();
+                // Reload workflows
+                currentPage = 0;
+                workflows = [];
+                loadWorkflows();
+            } catch (error) {
+                console.error('Error creating workflow:', error);
+            }
+        });
+
+        // Load workflows on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWorkflows();
+        });
+    </script>
+</body>
+</html>
